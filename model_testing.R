@@ -2,6 +2,7 @@
 
 library(dplyr)
 library(ggplot2)
+library(ggrepel)
 library(stringr)
 
 hitters_bbref <- read.csv("project/data/2025_reg_season_hitters_bbref.csv")
@@ -26,7 +27,8 @@ hitters_clean <- hitters_bbref %>%
   mutate(HRrate = HR / PA) %>%
   mutate(TTOrate = BBrate + Krate + HRrate) %>%
   mutate(ISO = (X2B + (2 * X3B) + (3 * HR)) / AB) %>%
-  mutate(wRC = calculate_WRC(H, HR, BB, HBP, IBB, SB, CS, TB, AB))
+  mutate(wRC = calculate_WRC(H, HR, BB, HBP, IBB, SB, CS, TB, AB)) %>%
+  mutate(BABIP = (H - HR) / (AB - SO - HR + SF))
 
 #################################
 # Linear multi-variable regression model
@@ -39,16 +41,27 @@ plot(error_1, y_hat_1)
 summary(model_1)
 
 #################################
-# Quadratic model
+# Quadratic model using OPS
 #################################
 
-# stat_2 <- hitters_clean$wRC
-#
-# model_2 <- lm(hitters_clean$WAR ~ stat_2 + stat_2 ^ 2)
-# y_hat_2 <- predict(model_2)
-# error_2 <- hitters_clean$WAR - y_hat_2
-# plot(error_2, y_hat_2)
-# summary(model_2)
+stat_2 <- hitters_clean$OPS
+stat_2_sq <- stat_2 ^ 2
+
+model_2 <- lm(hitters_clean$WAR ~ stat_2 + stat_2_sq)
+y_hat_2 <- predict(model_2)
+error_2 <- hitters_clean$WAR - y_hat_2
+plot(error_2, y_hat_2)
+summary(model_2)
+
+#################################
+# Logarithmic model using BABIP
+#################################
+
+model_5 <- lm(hitters_clean$WAR ~ hitters_clean$BABIP + log(hitters_clean$BABIP))
+y_hat_5 <- predict(model_5)
+error_5 <- hitters_clean$WAR - y_hat_5
+plot(error_5, y_hat_5)
+summary(model_5)
 
 #################################
 # Statcast expected statistics model
