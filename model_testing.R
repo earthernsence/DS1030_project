@@ -5,7 +5,7 @@ library(ggplot2)
 library(ggrepel)
 library(stringr)
 
-hitters_bbref <- read.csv("project/data/2025_reg_season_hitters_bbref.csv")
+hitters_bbref <- read.csv("project/data/2025_reg_season_hitters_bbref.csv", fileEncoding = "UTF-8")
 hitters_savant <- read.csv("project/data/2025_reg_season_hitters_savant.csv")
 hitters_statcast <- read.csv("project/data/2025_reg_season_hitters_savant_statcast.csv")
 hitters_expected <- read.csv("project/data/2025_reg_season_hitters_savant_expected_stats.csv")
@@ -30,38 +30,167 @@ hitters_clean <- hitters_bbref %>%
   mutate(wRC = calculate_WRC(H, HR, BB, HBP, IBB, SB, CS, TB, AB)) %>%
   mutate(BABIP = (H - HR) / (AB - SO - HR + SF))
 
+hitters_statcast <- hitters_statcast %>% arrange(desc(pa))
+
+#################################
+# Variables of interest
+#################################
+
+WAR <- hitters_clean$WAR
+OBP <- hitters_clean$OBP
+OPS <- hitters_clean$OPS
+PA <- hitters_clean$PA
+ISO <- hitters_clean$ISO
+BABIP <- hitters_clean$BABIP
+TTOrate <- hitters_clean$TTOrate
+TB <- hitters_clean$TB
+RBI <- hitters_clean$RBI
+Handedness <- as.factor(hitters_clean$Handedness)
+
 #################################
 # Linear multi-variable regression model
 #################################
 
-model_1 <- lm(hitters_clean$WAR ~ hitters_clean$OPS + hitters_clean$PA + hitters_clean$ISO + hitters_clean$Handedness)
+model_1 <- lm(WAR ~ OBP + PA + ISO + Handedness)
 y_hat_1 <- predict(model_1)
-error_1 <- hitters_clean$WAR - y_hat_1
-plot(error_1, y_hat_1)
+error_1 <- WAR - y_hat_1
 summary(model_1)
+
+df_1 <- data.frame(
+  x = error_1,
+  y = y_hat_1,
+  labels = hitters_clean$Player,
+  handedness = hitters_clean$Handedness
+)
+
+ggplot(df_1, aes(x = x, y = y, color = handedness)) +
+  geom_point() +
+  scale_color_manual(values = c("L" = "red", "R" = "blue", "S" = "purple")) +
+  labs(x = "Residual",
+       y = "Predicted WAR",
+       title = "Model 1",
+       subtitle = "OBP, PA, ISO, & Handedness"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(aes(label = labels),
+            vjust = -0.5,
+            hjust = 0.5)
 
 #################################
 # Quadratic model using OPS
 #################################
 
-stat_2 <- hitters_clean$OPS
-stat_2_sq <- stat_2 ^ 2
+OPS_sq <- OPS ^ 2
 
-model_2 <- lm(hitters_clean$WAR ~ stat_2 + stat_2_sq)
+model_2 <- lm(WAR ~ OPS + OPS_sq)
 y_hat_2 <- predict(model_2)
-error_2 <- hitters_clean$WAR - y_hat_2
-plot(error_2, y_hat_2)
+error_2 <- WAR - y_hat_2
 summary(model_2)
 
+df_2 <- data.frame(
+  x = error_2,
+  y = y_hat_2,
+  labels = hitters_clean$Player
+)
+
+ggplot(df_2, aes(x = x, y = y)) +
+  geom_point() +
+  labs(x = "Residual",
+       y = "Predicted WAR",
+       title = "Model 2",
+       subtitle = "Quadratic OPS"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(aes(label = labels),
+            vjust = -0.5,
+            hjust = 0.5)
+
 #################################
-# Logarithmic model using BABIP
+# wRC-component-based model
 #################################
 
-model_5 <- lm(hitters_clean$WAR ~ hitters_clean$BABIP + log(hitters_clean$BABIP))
-y_hat_5 <- predict(model_5)
-error_5 <- hitters_clean$WAR - y_hat_5
-plot(error_5, y_hat_5)
-summary(model_5)
+H <- hitters_clean$H
+HR <- hitters_clean$HR
+BB <- hitters_clean$BB
+HBP <- hitters_clean$HBP
+IBB <- hitters_clean$IBB
+SB <- hitters_clean$SB
+CS <- hitters_clean$CS
+TB <- hitters_clean$TB
+AB <- hitters_clean$AB
+
+model_6 <- lm(WAR ~ H + HR + BB + HBP + IBB + SB + CS + TB + AB)
+y_hat_6 <- predict(model_6)
+error_6 <- WAR - y_hat_6
+summary(model_6)
+
+df_3 <- data.frame(
+  x = error_6,
+  y = y_hat_6,
+  labels = hitters_clean$Player,
+  EV_avg = hitters_statcast$exit_velocity_avg,
+  HH_pct = hitters_statcast$hard_hit_percent,
+  barrel_rate = hitters_statcast$barrel_batted_rate,
+  TTOrate = hitters_clean$TTOrate
+)
+
+ggplot(df_3, aes(x = x, y = y, color = TTOrate)) +
+  geom_point() +
+  scale_color_gradient2(midpoint = median(df_3$TTOrate), low = "blue", mid = "#36393e", high = "red") +
+  labs(x = "Residual",
+       y = "Predicted WAR",
+       title = "Model 3",
+       subtitle = "wRC Components"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(aes(label = labels),
+            vjust = -0.5,
+            hjust = 0.5)
+
+#################################
+# wRC comparison model (for model 3)
+#################################
+
+# wRC <- hitters_clean$wRC
+
+# wrc_model <- lm(WAR ~ wRC)
+# y_hat_wrc <- predict(wrc_model)
+# error_wrc <- WAR - y_hat_wrc
+# summary(wrc_model)
+#
+# df_wrc <- data.frame(
+#   x = error_wrc,
+#   y = y_hat_wrc,
+#   labels = hitters_clean$Player
+# )
+#
+# ggplot(df_wrc, aes(x = x, y = y)) +
+#   geom_point() +
+#   labs(x = "Residual",
+#        y = "Predicted WAR",
+#        title = "Model 3: Comparison",
+#        subtitle = "wRC-based model"
+#   ) +
+#   scale_y_continuous(
+#     limits = c(-1, 10),
+#     breaks = seq(0, 10, 2.5),
+#     minor_breaks = seq(0, 10, 0.5)
+#   ) +
+#   geom_text(aes(label = labels),
+#             vjust = -0.5,
+#             hjust = 0.5)
 
 #################################
 # Statcast expected statistics model
@@ -79,8 +208,8 @@ summary(model_5)
 
 # model_4 <- lm(hitters_clean$WAR ~
 #                 hitters_statcast$exit_velocity_avg +
-#                   hitters_statcast$launch_angle_avg +
-#                   hitters_savant$sweet_spot_percent
+#                   hitters_savant$sweet_spot_percent +
+#                   hitters_statcast$avg_swing_speed
 # )
 # y_hat_4 <- predict(model_4)
 # error_4 <- hitters_clean$WAR - y_hat_4
