@@ -167,7 +167,7 @@ df_3 <- data.frame(
   TTOrate = hitters_clean$TTOrate
 )
 
-stat_to_investigate <- df_3$TTOrate
+stat_to_investigate <- df_3$EV_avg
 
 ggplot(df_3, aes(x = x, y = y, color = stat_to_investigate)) +
   geom_point() +
