@@ -14,6 +14,7 @@ hitters_bbref <- read.csv(
   "project/data/2025_reg_season_hitters_bbref.csv",
   fileEncoding = "UTF-8"
 )
+hitters_statcast <- read.csv("project/data/2025_reg_season_hitters_savant_statcast.csv")
 
 calculate_WRC <- function(H, HR, BB, HBP, IBB, SB, CS, TB, AB) {
   ((H - HR) + (0.7 * BB) + (0.7 * HBP) - (0.7 * IBB) + (0.9 * SB) - (0.45 * CS)) * (TB / AB)
@@ -26,7 +27,7 @@ calculate_WRC <- function(H, HR, BB, HBP, IBB, SB, CS, TB, AB) {
 # create a new variable for handedness (requires parsing the player name,
 # as that is where handedness is stored);
 # introduce new variables of interest based on pre-existing data:
-# - "three true outcome rate" (walks, strikeouts, and home runs per PA),
+# - "TTOrate" (three true outcome rate; walks, strikeouts, and home runs per PA),
 # - "ISO" (isolated power; emphasises XBH)
 # - "wRC" (weighted runs created; weighs each outcome and its ability to produce runs)
 # - "BABIP" (batting average on balls in play; excludes strikeouts and home runs);
@@ -39,7 +40,7 @@ hitters_clean <- hitters_bbref %>%
     str_sub(Player, -1) == "#" ~ "S",
     TRUE ~ "R"
   )) %>%
-  mutate(TTOrate = (BB / PA) + (SO / PA) + (HR / PA)) %>%
+  mutate(TTOrate = (BB + SO + HR) / PA) %>%
   mutate(ISO = SLG - BA) %>%
   mutate(wRC = calculate_WRC(H, HR, BB, HBP, IBB, SB, CS, TB, AB)) %>%
   mutate(BABIP = (H - HR) / (AB - SO - HR + SF)) %>%
@@ -56,6 +57,7 @@ hitters_statcast <- hitters_statcast %>% arrange(desc(pa))
 WAR <- hitters_clean$WAR
 
 OBP <- hitters_clean$OBP
+OPS <- hitters_clean$OPS
 PA <- hitters_clean$PA
 ISO <- hitters_clean$ISO
 Handedness <- as.factor(hitters_clean$Handedness)
@@ -91,10 +93,52 @@ ggplot(df_1, aes(x = x, y = y, color = handedness)) +
     breaks = seq(0, 10, 2.5),
     minor_breaks = seq(-1, 10, 0.5)
   ) +
+  scale_x_continuous(
+    breaks = seq(-3, 3, 1),
+    minor_breaks = seq(-3, 3, 0.25)
+  ) +
   geom_text(
     aes(label = labels),
     vjust = -0.5,
     hjust = 0.5
+  )
+
+war_comparison_1 <- data.frame(
+  x = hitters_clean$WAR,
+  y = y_hat_1,
+  labels = hitters_clean$Player,
+  handedness = hitters_clean$Handedness
+)
+
+ggplot(war_comparison_1, aes(x = x, y = y, color = handedness)) +
+  geom_point() +
+  scale_color_manual(values = c("L" = "red", "R" = "blue", "S" = "purple")) +
+  labs(
+    x = "Actual WAR",
+    y = "Predicted WAR",
+    title = "Model 1: Comparison to bWAR",
+    subtitle = "OBP, PA, ISO, & Handedness"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  scale_x_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(
+    aes(label = labels),
+    vjust = -0.5,
+    hjust = 0.5
+  ) +
+  geom_segment(
+    aes(x = -1, y = -1, xend = 10, yend = 10),
+    color = "black",
+    linetype = "dashed",
+    inherit.aes = FALSE
   )
 
 #################################
@@ -128,10 +172,50 @@ ggplot(df_2, aes(x = x, y = y)) +
     breaks = seq(0, 10, 2.5),
     minor_breaks = seq(-1, 10, 0.5)
   ) +
+  scale_x_continuous(
+    breaks = seq(-3, 3, 1),
+    minor_breaks = seq(-3, 3, 0.25)
+  ) +
   geom_text(
     aes(label = labels),
     vjust = -0.5,
     hjust = 0.5
+  )
+
+war_comparison_2 <- data.frame(
+  x = hitters_clean$WAR,
+  y = y_hat_2,
+  labels = hitters_clean$Player
+)
+
+ggplot(war_comparison_2, aes(x = x, y = y)) +
+  geom_point() +
+  labs(
+    x = "Actual WAR",
+    y = "Predicted WAR",
+    title = "Model 2: Comparison to bWAR",
+    subtitle = "Quadratic OPS"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  scale_x_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(
+    aes(label = labels),
+    vjust = -0.5,
+    hjust = 0.5
+  ) +
+  geom_segment(
+    aes(x = -1, y = -1, xend = 10, yend = 10),
+    color = "black",
+    linetype = "dashed",
+    inherit.aes = FALSE
   )
 
 #################################
@@ -188,8 +272,54 @@ ggplot(df_3, aes(x = x, y = y, color = stat_to_investigate)) +
     breaks = seq(0, 10, 2.5),
     minor_breaks = seq(-1, 10, 0.5)
   ) +
+  scale_x_continuous(
+    breaks = seq(-3, 3, 1),
+    minor_breaks = seq(-3, 3, 0.25)
+  ) +
   geom_text(
     aes(label = labels),
     vjust = -0.5,
     hjust = 0.5
+  )
+
+war_comparison_3 <- data.frame(
+  x = hitters_clean$WAR,
+  y = y_hat_3,
+  labels = hitters_clean$Player
+)
+
+ggplot(war_comparison_3, aes(x = x, y = y, color = stat_to_investigate)) +
+  geom_point() +
+  scale_color_gradient2(
+    midpoint = median(stat_to_investigate),
+    low = "blue",
+    mid = "#36393e",
+    high = "red"
+  ) +
+  labs(
+    x = "Actual WAR",
+    y = "Predicted WAR",
+    title = "Model 3: Comparison to bWAR",
+    subtitle = "wRC Components"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  scale_x_continuous(
+    limits = c(-1, 10),
+    breaks = seq(0, 10, 2.5),
+    minor_breaks = seq(-1, 10, 0.5)
+  ) +
+  geom_text(
+    aes(label = labels),
+    vjust = -0.5,
+    hjust = 0.5
+  ) +
+  geom_segment(
+    aes(x = -1, y = -1, xend = 10, yend = 10),
+    color = "black",
+    linetype = "dashed",
+    inherit.aes = FALSE
   )
