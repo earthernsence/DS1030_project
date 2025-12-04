@@ -16,6 +16,9 @@ hitters_bbref <- read.csv(
 )
 hitters_statcast <- read.csv("project/data/2025_reg_season_hitters_savant_statcast.csv")
 
+# Formula courtesy of Natalie Kerr
+# https://digitalshowcase.lynchburg.edu/utcp/309/
+
 calculate_WRC <- function(H, HR, BB, HBP, IBB, SB, CS, TB, AB) {
   ((H - HR) + (0.7 * BB) + (0.7 * HBP) - (0.7 * IBB) + (0.9 * SB) - (0.45 * CS)) * (TB / AB)
 }
@@ -148,7 +151,7 @@ ggplot(war_comparison_1, aes(x = x, y = y, color = handedness)) +
 
 OPS_sq <- OPS ^ 2
 
-model_2 <- lm(WAR ~ OPS + OPS_sq)
+model_2 <- lm(WAR ~ OPS + OPS)
 y_hat_2 <- predict(model_2)
 error_2 <- WAR - y_hat_2
 summary(model_2)
@@ -156,11 +159,18 @@ summary(model_2)
 df_2 <- data.frame(
   x = error_2,
   y = y_hat_2,
-  labels = hitters_clean$Player
+  labels = hitters_clean$Player,
+  real_WAR = hitters_clean$WAR
 )
 
-ggplot(df_2, aes(x = x, y = y)) +
+ggplot(df_2, aes(x = x, y = y, color = real_WAR)) +
   geom_point() +
+  scale_color_gradient2(
+    midpoint = median(df_2$real_WAR),
+    low = "blue",
+    mid = "#36393e",
+    high = "red"
+  ) +
   labs(
     x = "Residual",
     y = "Predicted WAR",
@@ -248,10 +258,11 @@ df_3 <- data.frame(
   EV_avg = hitters_statcast$exit_velocity_avg,
   HH_pct = hitters_statcast$hard_hit_percent,
   barrel_rate = hitters_statcast$barrel_batted_rate,
+  swing_speed = hitters_statcast$avg_swing_speed,
   TTOrate = hitters_clean$TTOrate
 )
 
-stat_to_investigate <- df_3$EV_avg
+stat_to_investigate <- df_3$barrel_rate
 
 ggplot(df_3, aes(x = x, y = y, color = stat_to_investigate)) +
   geom_point() +
