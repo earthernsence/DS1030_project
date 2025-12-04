@@ -32,6 +32,8 @@ hitters_clean <- hitters_bbref %>%
 
 hitters_statcast <- hitters_statcast %>% arrange(desc(pa))
 
+print(mean(hitters_savant$xbadiff))
+
 #################################
 # Variables of interest
 #################################

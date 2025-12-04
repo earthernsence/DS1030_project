@@ -10,11 +10,15 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 
+library(readr)
+
 hitters_bbref <- read.csv(
   "project/data/2025_reg_season_hitters_bbref.csv",
   fileEncoding = "UTF-8"
 )
-hitters_statcast <- read.csv("project/data/2025_reg_season_hitters_savant_statcast.csv")
+hitters_statcast <- read_csv(
+  "project/data/2025_reg_season_hitters_savant_statcast.csv"
+)
 
 # Formula courtesy of Natalie Kerr
 # https://digitalshowcase.lynchburg.edu/utcp/309/
@@ -51,7 +55,7 @@ hitters_clean <- hitters_bbref %>%
 
 # Also sort Statcast data by PA, descending, so that we can
 # use it in conjunction with BBref data.
-hitters_statcast <- hitters_statcast %>% arrange(desc(pa))
+hitters_statcast <- hitters_statcast %>% arrange(desc(pa), player)
 
 #################################
 # Variables of interest
@@ -262,7 +266,7 @@ df_3 <- data.frame(
   TTOrate = hitters_clean$TTOrate
 )
 
-stat_to_investigate <- df_3$barrel_rate
+stat_to_investigate <- df_3$swing_speed
 
 ggplot(df_3, aes(x = x, y = y, color = stat_to_investigate)) +
   geom_point() +
